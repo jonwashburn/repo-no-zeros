@@ -53,6 +53,24 @@ def det2_on_Ω_proved
   (hNZ : ∀ {s}, s ∈ Ω → det2 s ≠ 0) : Det2OnOmega :=
   det2_on_Ω_assumed hA (by intro s hs; exact hNZ (s := s) hs)
 
+/-- Identify the RS symbol `det2` with the diagonal Euler product `diagDet2` on Ω
+and package analyticity and nonvanishing into `Det2OnOmega`. -/
+def det2_on_Ω_proved_via_diagonal
+  (hEq : Set.EqOn det2 RH.AcademicFramework.DiagonalFredholm.diagDet2 Ω)
+  (hDiagA : AnalyticOn ℂ RH.AcademicFramework.DiagonalFredholm.diagDet2 Ω)
+  (hDiagNZ : ∀ {s}, s ∈ Ω → RH.AcademicFramework.DiagonalFredholm.diagDet2 s ≠ 0)
+  : Det2OnOmega := by
+  classical
+  -- Analyticity transfers by congruence on Ω
+  have hA : AnalyticOn ℂ det2 Ω := (AnalyticOn.congr hDiagA hEq.symm)
+  -- Nonvanishing transfers pointwise on Ω
+  have hNZ : ∀ {s}, s ∈ Ω → det2 s ≠ 0 := by
+    intro s hs
+    have hEs : det2 s = RH.AcademicFramework.DiagonalFredholm.diagDet2 s := by
+      have := hEq hs; simpa using this
+    simpa [hEs] using hDiagNZ (s := s) hs
+  exact det2_on_Ω_assumed hA (by intro s hs; exact hNZ (s := s) hs)
+
 /-- Builder: derive `Det2OnOmega` for `RS.det2` from a diagonal Fredholm
 model and an analytic, nonvanishing renormalizer on `Ω`.
 
