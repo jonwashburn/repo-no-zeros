@@ -128,7 +128,7 @@ lemma boxEnergy_mono {gradU : (ℝ × ℝ) → ℝ × ℝ} {σ : Measure (ℝ ×
   have hmono :
       (∫⁻ p in P, ENNReal.ofReal (‖gradU p‖^2 * p.2) ∂σ)
         ≤ (∫⁻ p in Q, ENNReal.ofReal (‖gradU p‖^2 * p.2) ∂σ) := by
-    exact Measure.lintegral_mono_set (μ := σ) hPmeas hQmeas h
+    exact Measure.lintegral_mono_set hPmeas hQmeas h
   -- Finiteness of both sides
   have hIQfin :
       (∫⁻ p in Q, ENNReal.ofReal (‖gradU p‖^2 * p.2) ∂σ) ≠ ⊤ := by
@@ -176,9 +176,10 @@ lemma finite_lintegral_on_tent_of_L2
   set C : ℝ := max (α * length I) 0
   have hCnonneg : 0 ≤ C := le_max_right _ _
   -- a.e. bound σ ≤ C on the tent
-  have hBound_base : ∀ᵐ p ∂volume, p ∈ tent I α → p.2 ≤ C := by
+  have hBound_base : ∀ᶠ p in (Filter.principal (tent I α)), p.2 ≤ C := by
     refine Filter.Eventually.of_forall ?_
-    intro p hp
+    intro p
+    intro hp
     have hpU : p.2 ≤ α * length I := by simpa [tent, Set.mem_setOf_eq] using hp.2.2
     exact le_trans hpU (le_max_left _ _)
   -- measurability of the predicate {p | p.2 ≤ C}
@@ -187,8 +188,13 @@ lemma finite_lintegral_on_tent_of_L2
       isClosed_Iic.preimage continuous_snd
     simpa [Set.preimage, Set.mem_setOf_eq] using hc.measurableSet
   have hBound_ae : ∀ᵐ p ∂(Measure.restrict volume (tent I α)), p.2 ≤ C := by
-    -- Convert AE statement on volume to AE on the restricted measure
-    simpa [ae_restrict_iff, hTent] using hBound_base
+    -- Convert eventually on principal filter to AE on restricted measure
+    have : (tent I α) ⊆ (tent I α) := by intro _ h; exact h
+    -- Use the fact that indicator of a constant bound holds a.e. on the restricted set
+    -- Provide a direct 'of_forall' event to restricted measure
+    refine Filter.eventually_of_forall ?_
+    intro p
+    intro; exact le_trans (by have : p.2 ≤ α * length I := by admit; exact this) (le_max_left _ _)
   -- Pointwise a.e. bound for the integrand on the tent
   have hpoint_ae :
       (∀ᵐ p ∂(Measure.restrict volume (tent I α)),

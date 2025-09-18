@@ -56,7 +56,7 @@ lemma psi_even_pointwise : ∀ t, psi (-t) = psi t := by
       exact ht ⟨by simpa using (neg_le_neg hR), by simpa using (neg_le_neg hL)⟩
     simp [psi, Set.indicator_of_not_mem ht, Set.indicator_of_not_mem hneg]
 
-lemma psi_even : Even psi := by
+lemma psi_even : Function.Even psi := by
   intro t; exact psi_even_pointwise t
 
 lemma psi_hasCompactSupport : HasCompactSupport psi := by
@@ -109,11 +109,7 @@ theorem poisson_plateau_lower_bound
   -- The big interval S and a length-2b subinterval J around x
   set S : Set ℝ := Icc (-2 : ℝ) 2
   have hS_meas : MeasurableSet S := isClosed_Icc.measurableSet
-<<<<<<< HEAD
   have hb0 : 0 ≤ b := le_of_lt hb
-=======
-    have hb0 : 0 ≤ b := le_of_lt hb
->>>>>>> origin/main
   have hxI : -1 ≤ x ∧ x ≤ 1 := abs_le.mp hx
   -- J := [x - b, x + b] ⊆ [-2,2]
   have hJsubset : Icc (x - b) (x + b) ⊆ S := by
@@ -195,7 +191,7 @@ theorem poisson_plateau_lower_bound
     have : volume (Icc (x - b) (x + b)) = ENNReal.ofReal ((x + b) - (x - b)) := by
       simpa [sub_eq_add_neg] using (Real.volume_Icc : _)
     have hnn : 0 ≤ (2 : ℝ) * b := mul_nonneg (by norm_num) hb0
-    have : (volume (Icc (x - b) (x + b))).toReal = (2 : ℝ) * b := by
+  have : (volume (Icc (x - b) (x + b))).toReal = (2 : ℝ) * b := by
       simpa [this, ENNReal.toReal_ofReal, hnn] using rfl
     simpa using this
   have constJ : (∫ t in Icc (x - b) (x + b), poissonKernel b (x - t))

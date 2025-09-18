@@ -1066,12 +1066,47 @@ theorem RiemannHypothesis_from_certificate_rep_on
   classical
   -- Choose the outer and define the off-zeros set
   let O : ℂ → ℂ := RH.RS.OuterHalfPlane.choose_outer hOuterExist
-  -- Poisson representation on S := Ω \ {ξ_ext=0} via the M=2 builder
+  -- Boundary bound |Re F_pinch(1/2+it)| ≤ 2 for all t (case split on boundary zeros)
+  have hBnd2 : ∀ t : ℝ,
+      |(RH.AcademicFramework.HalfPlaneOuter.F_pinch RH.RS.det2 O
+         (RH.AcademicFramework.HalfPlaneOuter.boundary t)).re| ≤ (2 : ℝ) := by
+    classical
+    intro t
+    -- Either O or ξ_ext may vanish on the boundary; in those cases F_pinch(boundary t)=0.
+    by_cases hO : O (RH.AcademicFramework.HalfPlaneOuter.boundary t) = 0
+    · by_cases hXi : RH.AcademicFramework.CompletedXi.riemannXi_ext
+          (RH.AcademicFramework.HalfPlaneOuter.boundary t) = 0
+      · -- both zero → F_pinch(boundary t) = 0
+        have : (RH.AcademicFramework.HalfPlaneOuter.F_pinch RH.RS.det2 O
+                  (RH.AcademicFramework.HalfPlaneOuter.boundary t)) = 0 := by
+          simp [RH.AcademicFramework.HalfPlaneOuter.F_pinch, RH.RS.J_pinch,
+                hO, hXi, div_eq_mul_inv, mul_comm, mul_left_comm, mul_assoc]
+        simpa [this] using
+          (le_trans (by simpa using (abs_nonneg _)) (by norm_num : (0 : ℝ) ≤ 2))
+      · -- O=0, ξ≠0 → use boundary inequality
+        have hBME := (RH.RS.OuterHalfPlane.choose_outer_spec hOuterExist).2
+        have h := RH.RS.boundary_Re_F_pinch_le_two (O := O) hBME t (by simpa [hO]) (by exact hXi)
+        simpa using h
+    · by_cases hXi : RH.AcademicFramework.CompletedXi.riemannXi_ext
+          (RH.AcademicFramework.HalfPlaneOuter.boundary t) = 0
+      · -- ξ=0, O≠0 → F_pinch(boundary t) = 0
+        have : (RH.AcademicFramework.HalfPlaneOuter.F_pinch RH.RS.det2 O
+                  (RH.AcademicFramework.HalfPlaneOuter.boundary t)) = 0 := by
+          simp [RH.AcademicFramework.HalfPlaneOuter.F_pinch, RH.RS.J_pinch,
+                hO, hXi, div_eq_mul_inv, mul_comm, mul_left_comm, mul_assoc]
+        simpa [this] using
+          (le_trans (by simpa using (abs_nonneg _)) (by norm_num : (0 : ℝ) ≤ 2))
+      · -- nonvanishing boundary → apply boundary inequality
+        have hBME := (RH.RS.OuterHalfPlane.choose_outer_spec hOuterExist).2
+        have h := RH.RS.boundary_Re_F_pinch_le_two (O := O) hBME t (by exact hO) (by exact hXi)
+        simpa using h
+  -- Poisson representation on S := Ω \ {ξ_ext=0} via the general builder with M=2 and supplied equality
   have hRepOn : RH.AcademicFramework.HalfPlaneOuter.HasHalfPlanePoissonRepresentationOn
       (RH.AcademicFramework.HalfPlaneOuter.F_pinch RH.RS.det2 O)
       (RH.RS.Ω \ {z | RH.AcademicFramework.CompletedXi.riemannXi_ext z = 0}) :=
-    RH.AcademicFramework.HalfPlaneOuter.pinch_representation_on_offXi_M2
-      (hDet2 := hDet2) (hOuterExist := hOuterExist) (hXi := hXiAnalytic)
+    RH.AcademicFramework.HalfPlaneOuter.pinch_representation_on_offXi
+      (hDet2 := hDet2) (O := O) ((RH.RS.OuterHalfPlane.choose_outer_spec hOuterExist).1)
+      (M := 2) (hBnd := hBnd2) (hXi := hXiAnalytic) (hReEq := hReEq)
   -- Produce (P+) for F := 2·J_pinch det2 O from the certificate Kξ + Carleson route
   let F : ℂ → ℂ := fun z => (2 : ℂ) * (RH.RS.J_pinch RH.RS.det2 O z)
   have hPPlus : RH.Cert.PPlus F := by

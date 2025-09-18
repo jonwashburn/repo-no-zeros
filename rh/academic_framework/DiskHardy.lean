@@ -1,6 +1,7 @@
 import Mathlib.Data.Complex.Basic
 import Mathlib.Analysis.Analytic.Basic
 import Mathlib.MeasureTheory.Integral.Bochner
+import Mathlib.MeasureTheory.Measure.Lebesgue.Basic
 
 /-!
 Academic holder: disk-level Hardy/Smirnov interfaces used by the Cayley route.
@@ -8,9 +9,13 @@ We record the unit disk, boundary parametrization, a disk Poisson kernel, and a
 statement-level Poisson representation structure for the unit disk. RS/AF layers
 consume these via the Cayley adapters.
 -/
+noncomputable section
 namespace RH
 namespace AcademicFramework
 namespace DiskHardy
+
+open MeasureTheory
+open scoped MeasureTheory
 
 /- Unit disk set. -/
 def unitDisk : Set ℂ := { z : ℂ | ‖z‖ < 1 }

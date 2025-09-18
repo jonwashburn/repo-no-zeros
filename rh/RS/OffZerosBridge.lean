@@ -10,6 +10,7 @@ import Mathlib.Analysis.Complex.RemovableSingularity
 import Mathlib.Analysis.SpecialFunctions.Exponential
 import Mathlib.Topology.Algebra.Field
 import Mathlib.Topology.MetricSpace.Basic
+import rh.academic_framework.CompletedXi
 
 noncomputable section
 open Complex Filter Set
