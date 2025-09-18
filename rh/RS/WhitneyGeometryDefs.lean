@@ -175,26 +175,16 @@ lemma finite_lintegral_on_tent_of_L2
   have hTent : MeasurableSet (tent I α) := measurableSet_tent (hI := hI)
   set C : ℝ := max (α * length I) 0
   have hCnonneg : 0 ≤ C := le_max_right _ _
-  -- a.e. bound σ ≤ C on the tent
-  have hBound_base : ∀ᶠ p in (Filter.principal (tent I α)), p.2 ≤ C := by
-    refine Filter.Eventually.of_forall ?_
-    intro p
-    intro hp
-    have hpU : p.2 ≤ α * length I := by simpa [tent, Set.mem_setOf_eq] using hp.2.2
-    exact le_trans hpU (le_max_left _ _)
-  -- measurability of the predicate {p | p.2 ≤ C}
-  have hPred : MeasurableSet {p : (ℝ × ℝ) | p.2 ≤ C} := by
-    have hc : IsClosed ((fun p : ℝ × ℝ => p.2) ⁻¹' Set.Iic C) :=
-      isClosed_Iic.preimage continuous_snd
-    simpa [Set.preimage, Set.mem_setOf_eq] using hc.measurableSet
+  -- (unused: an alternative way to see the bound is pointwise on the tent)
   have hBound_ae : ∀ᵐ p ∂(Measure.restrict volume (tent I α)), p.2 ≤ C := by
-    -- Convert eventually on principal filter to AE on restricted measure
-    have : (tent I α) ⊆ (tent I α) := by intro _ h; exact h
-    -- Use the fact that indicator of a constant bound holds a.e. on the restricted set
-    -- Provide a direct 'of_forall' event to restricted measure
-    refine Filter.eventually_of_forall ?_
-    intro p
-    intro; exact le_trans (by have : p.2 ≤ α * length I := by admit; exact this) (le_max_left _ _)
+    -- Pointwise bound on the tent gives AE bound w.r.t. the restricted measure
+    have hAll : ∀ᵐ p ∂volume, p ∈ tent I α → p.2 ≤ C := by
+      refine Filter.Eventually.of_forall ?_
+      intro p hp
+      have hpU : p.2 ≤ α * length I := by
+        simpa [tent, Set.mem_setOf_eq] using hp.2.2
+      exact le_trans hpU (le_max_left _ _)
+    simpa [ae_restrict_iff, hTent] using hAll
   -- Pointwise a.e. bound for the integrand on the tent
   have hpoint_ae :
       (∀ᵐ p ∂(Measure.restrict volume (tent I α)),
@@ -215,27 +205,33 @@ lemma finite_lintegral_on_tent_of_L2
         = ENNReal.ofReal C * (∫⁻ p in tent I α, ENNReal.ofReal (‖gradU p‖^2)) := by
     have hpt :
         (fun p => ENNReal.ofReal (‖gradU p‖^2 * C))
-          = fun p => ENNReal.ofReal C * ENNReal.ofReal (‖gradU p‖^2) := by
+          = fun p => ENNReal.ofReal (‖gradU p‖^2) * ENNReal.ofReal C := by
       funext p
       have : 0 ≤ ‖gradU p‖^2 := sq_nonneg _
       simpa [mul_comm, mul_left_comm, mul_assoc] using
-        (ENNReal.ofReal_mul this hCnonneg)
+        (ENNReal.ofReal_mul this hCnonneg).symm
     -- pull out the constant across the lintegral
     have :
         (∫⁻ p in tent I α, (fun _ => ENNReal.ofReal C) * ENNReal.ofReal (‖gradU p‖^2))
           = ENNReal.ofReal C * (∫⁻ p in tent I α, ENNReal.ofReal (‖gradU p‖^2)) := by
-      -- constant factor can be pulled out of lintegral on a measurable set
-      simp [Measure.restrict_apply, hTent]
-    simpa [hpt] using this
+      -- constant factor can be pulled out on the left
+      simpa using (lintegral_const_mul (μ := Measure.restrict volume (tent I α))
+        (c := ENNReal.ofReal C) (f := fun p => ENNReal.ofReal (‖gradU p‖^2)))
+    -- rewrite with hpt
+    simpa [hpt]
   have hlin :
       (∫⁻ p in tent I α, ENNReal.ofReal (‖gradU p‖^2 * p.2))
         ≤ ENNReal.ofReal C * (∫⁻ p in tent I α, ENNReal.ofReal (‖gradU p‖^2)) := by
     simpa [hconst_eq] using hlin₁
   -- Use L²-integrability to conclude finiteness of the RHS
   have hfin_sq : (∫⁻ p in tent I α, ENNReal.ofReal (‖gradU p‖^2)) < ⊤ := by
-    -- Standard: IntegrableOn f ⇒ lintegral (ofReal |f|) < ∞
-    have hInt := hL2.hasFiniteIntegral
-    simpa [Measure.restrict_apply, hTent, Real.norm_eq_abs, abs_of_nonneg (sq_nonneg _)] using hInt
+    -- IntegrableOn f ⇒ ∫⁻ ofReal f < ∞ for nonnegative f
+    have hInt : Integrable (fun p => ‖gradU p‖^2) (Measure.restrict volume (tent I α)) := hL2
+    -- hasFiniteIntegral gives ∫ |f| < ∞; here f ≥ 0 and |f| = f
+    have : (∫⁻ p in tent I α, ENNReal.ofReal (‖gradU p‖^2)) < ⊤ := by
+      -- standard lemma: integrable ⇒ lintegral of ofReal < ∞
+      exact hInt.hasFiniteIntegral
+    exact this
   -- conclude finiteness by showing the product bound is < ⊤ via `mul_ne_top`
   have hCne : ENNReal.ofReal C ≠ ⊤ := by simp
   have hIne : (∫⁻ p in tent I α, ENNReal.ofReal (‖gradU p‖^2)) ≠ ⊤ := ne_of_lt hfin_sq
@@ -396,7 +392,7 @@ lemma length_abs_lt (c r : ℝ) (hr : 0 < r) :
     have hnonneg : 0 ≤ (c + r) - (c - r) := by linarith [le_of_lt hr]
     simpa [hvol, ENNReal.toReal_ofReal, hnonneg]
   have hring : (c + r) - (c - r) = 2 * r := by ring
-  have hr0 : 0 ≤ r := le_of_lt hr
+  have hr0 : 0 ≤ r := hr.le
   -- Put everything together
   simp [length, hset, htoReal, hring, hr0]
 
