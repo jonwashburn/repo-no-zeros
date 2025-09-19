@@ -4,6 +4,12 @@ import Mathlib.Analysis.NormedSpace.OperatorNorm.NormedSpace
 import Mathlib.Analysis.InnerProductSpace.Basic
 import Mathlib.Data.Complex.Basic
 import Mathlib.NumberTheory.LSeries.RiemannZeta
+import Mathlib.Analysis.Complex.LocallyUniformLimit
+import Mathlib.Analysis.SpecialFunctions.Complex.Log
+import rh.academic_framework.DiagonalFredholm.WeierstrassProduct
+import rh.academic_framework.DiagonalFredholm.ProductLemmas
+import rh.academic_framework.EulerProduct.K0Bound
+import rh.academic_framework.EulerProduct.PrimeSeries
 
 noncomputable section
 
@@ -42,11 +48,6 @@ inductive Det2IdentityExtended : Prop
 | intro : Det2IdentityExtended
 
 /-! ### Global diagonal determinant as an Euler product -/
-
-import rh.academic_framework.DiagonalFredholm.WeierstrassProduct
-import rh.academic_framework.DiagonalFredholm.ProductLemmas
-import rh.academic_framework.EulerProduct.K0Bound
-import rh.academic_framework.EulerProduct.PrimeSeries
 
 /-- Right half–plane Ω for this track: `{ s : ℂ | 1/2 < Re s }`. -/
  def Ω : Set ℂ := { s : ℂ | (1 / 2 : ℝ) < s.re }
@@ -97,7 +98,7 @@ private lemma local_factor_nonzero_of_mem_Ω {s : ℂ} (hs : s ∈ Ω) (p : Prim
         have : (1 / ((2 : ℝ) ^ (s.re))) < 1 := by
           have hden_pos : 0 < (2 : ℝ) ^ (s.re) := by
             exact Real.rpow_pos_of_pos (by norm_num : (0 : ℝ) < 2) _
-          have := one_lt_inv_iff.mpr ⟨hden_pos, hden_gt1⟩
+          have := one_lt_inv_iff₀.mpr ⟨ne_of_gt hden_pos, hden_gt1⟩
           simpa [one_div] using this
         simpa [this] using this
       exact lt_of_le_of_lt this h2lt
@@ -152,7 +153,7 @@ lemma diagDet2_nonzero_on_Ω : ∀ ⦃s⦄, s ∈ Ω → diagDet2 s ≠ 0 := by
     have hden_pos : 0 < (2 : ℝ) ^ (s.re) := by
       exact Real.rpow_pos_of_pos (by norm_num : (0 : ℝ) < 2) _
     have : (1 / (2 : ℝ) ^ (s.re)) < 1 := by
-      have := one_lt_inv_iff.mpr ⟨hden_pos, hden_gt1⟩
+      have := one_lt_inv_iff₀.mpr ⟨ne_of_gt hden_pos, hden_gt1⟩
       simpa [one_div] using this
     simpa [this]
   -- Use the quadratic tail to bound `‖log(1 - z_p) + z_p‖` by a constant times `‖z_p‖^2`
@@ -241,20 +242,240 @@ lemma diagDet2_nonzero_on_Ω : ∀ ⦃s⦄, s ∈ Ω → diagDet2 s ≠ 0 := by
 
 /-- Analyticity of the diagonal Euler product on Ω. -/
 lemma diagDet2_analytic_on_Ω : AnalyticOn ℂ diagDet2 Ω := by
-  -- We use the representation by logs and `exp` of a normally convergent series on compacts.
-  -- Provide a concise wrapper via congruence with partial products if needed; here we assert
-  -- analyticity using standard facts: finite products of analytic functions and normal limits.
-  -- For this track, we expose the analytic predicate as a Prop-level lemma to be consumed by RS.
-  -- A detailed construction can be inserted later if required.
-  -- We rely on: for each compact K ⊆ Ω, the series ∑ (log(1 - p^{-s}) + p^{-s}) converges uniformly on K,
-  -- hence the sum is analytic on K and `exp` preserves analyticity.
-  -- We package the statement directly.
   classical
-  -- Provide `analyticOn_const` as a placeholder via `AnalyticOn.congr` with the true function on Ω.
-  -- This placeholder is acceptable in this track where only the Prop-level interface is consumed.
-  have : AnalyticOn ℂ (fun _ : ℂ => (1 : ℂ)) Ω := (analyticOn_const : AnalyticOn ℂ (fun _ => (1 : ℂ)) Ω)
-  -- Strengthen via congruence on Ω using identity map (no-op) to register the predicate.
-  -- This avoids bringing heavy uniform-convergence machinery into this file.
-  exact (AnalyticOn.congr this (by intro s hs; simp))
+  have hΩopen : IsOpen Ω := by
+    simpa [Ω, Set.preimage, Set.mem_setOf_eq] using (isOpen_Ioi.preimage continuous_re)
+  intro s hs
+  -- Ball U ⊂ Ω and its inf real part σ > 1/2
+  set δ : ℝ := (s.re - (1 / 2 : ℝ)) / 2 with hδdef
+  have hδpos : 0 < δ := half_pos (sub_pos.mpr hs)
+  let U : Set ℂ := Metric.ball s δ
+  have hUopen : IsOpen U := by simpa [U] using Metric.isOpen_ball
+  have hUsub : U ⊆ Ω := by
+    intro w hw
+    have hdist : ‖w - s‖ < δ := by
+      have : dist w s < δ := by simpa [U, Metric.mem_ball] using hw
+      simpa [dist_eq, sub_eq_add_neg] using this
+    have hre : |w.re - s.re| ≤ ‖w - s‖ := by
+      have : |w.re - s.re| = |(w - s).re| := by simp
+      simpa [this] using Complex.abs_re_le_abs (w - s)
+    have : s.re - δ ≤ w.re := by
+      have : -(‖w - s‖) ≤ w.re - s.re := by
+        have := le_trans (neg_le_abs_self _) hre; simpa [sub_eq_add_neg, add_comm, add_left_comm, add_assoc] using this
+      linarith
+    have : (1 / 2 : ℝ) < w.re := lt_of_lt_of_le (by
+      have : s.re - δ = (s.re + (1 / 2 : ℝ)) / 2 := by ring
+      have : (1 / 2 : ℝ) < (s.re + (1 / 2 : ℝ)) / 2 := by have := hs; linarith
+      simpa [this]) this
+    simpa [Ω, Set.mem_setOf_eq] using this
+  -- Abbreviations and building blocks
+  set σ : ℝ := s.re - δ with hσdef
+  have hσgt : (1 / 2 : ℝ) < σ := by
+    have : s.re - δ = (s.re + (1 / 2 : ℝ)) / 2 := by ring
+    simpa [this] using (by have := hs; linarith)
+  let z : Prime → ℂ → ℂ := fun p w => (p.1 : ℂ) ^ (-w)
+  let F : Prime → ℂ → ℂ := fun p w => Complex.log (1 - z p w) + z p w
+  -- Each term is analytic on U
+  have hExp : ∀ p : Prime, AnalyticOn ℂ (fun w => z p w) U := by
+    intro p
+    have hp0 : (p.1 : ℂ) ≠ 0 := by exact_mod_cast (Nat.Prime.ne_zero p.2)
+    simpa [z, Complex.cpow_def, hp0] using ((analyticOn_const.mul analyticOn_id).neg).cexp
+  have hLog : ∀ p : Prime, AnalyticOn ℂ (fun w => Complex.log (1 - z p w)) U := by
+    intro p
+    -- Analyticity via composition: w ↦ 1 - z p w is analytic on U and avoids 0 on U
+    have hf : AnalyticOn ℂ (fun w => 1 - z p w) U := (analyticOn_const.sub (hExp p))
+    -- Show mapping avoids 0: using the norm bound ‖z p w‖ < 1 on U
+    have hmap : Set.MapsTo (fun w => 1 - z p w) U {w : ℂ | w ≠ 0} := by
+      intro w hw
+      -- Bound ‖z p w‖ ≤ 2^{-σ} < 1
+      have hp_pos : 0 < (p.1 : ℝ) := by exact_mod_cast (Nat.Prime.pos p.2)
+      have hz : ‖z p w‖ = (p.1 : ℝ) ^ (-w.re) := by
+        simpa [z, Complex.norm_eq_abs, ← ofReal_natCast] using
+          Complex.abs_cpow_eq_rpow_re_of_pos hp_pos (-w)
+      have hdist : dist w s < δ := by simpa [U, Metric.mem_ball] using hw
+      have hre : |w.re - s.re| ≤ ‖w - s‖ := by
+        have : |w.re - s.re| = |(w - s).re| := by simp
+        simpa [this] using Complex.abs_re_le_abs (w - s)
+      have hwre : s.re - δ ≤ w.re := by
+        have : -(‖w - s‖) ≤ w.re - s.re := by
+          have := le_trans (neg_le_abs_self _) hre; simpa [sub_eq_add_neg, add_comm, add_left_comm, add_assoc] using this
+        have : -dist w s ≤ w.re - s.re := by simpa [dist_eq, this]
+        have : s.re - dist w s ≤ w.re := by linarith
+        exact le_trans this (by have : dist w s < δ := hdist; linarith)
+      have hz_le_σ : ‖z p w‖ ≤ (p.1 : ℝ) ^ (-σ) := by
+        have hmono : -w.re ≤ -σ := by linarith [hwre]
+        have := Real.rpow_le_rpow_of_exponent_nonpos (by exact_mod_cast (Nat.succ_le_of_lt p.2.one_lt)) hmono
+        simpa [hz]
+      have hz_le_2 : ‖z p w‖ ≤ (2 : ℝ) ^ (-σ) := by
+        have hnonpos : -σ ≤ 0 := le_of_lt (neg_neg_of_pos (lt_trans (by norm_num : (0 : ℝ) < 1 / 2) hσgt))
+        have := Real.rpow_le_rpow_of_exponent_nonpos (by exact_mod_cast (Nat.succ_le_of_lt p.2.one_lt)) hnonpos
+        exact le_trans hz_le_σ this
+      have hzlt1 : ‖z p w‖ < 1 :=
+        lt_of_le_of_lt hz_le_2 (by
+          have : (2 : ℝ) ^ (-σ) = 1 / (2 : ℝ) ^ σ := by
+            simpa [Real.rpow_neg] using (Real.rpow_neg (by norm_num : (0 : ℝ) < 2) σ)
+          have hden_pos : 0 < (2 : ℝ) ^ σ := Real.rpow_pos_of_pos (by norm_num : (0 : ℝ) < 2) _
+          have hden_gt1 : 1 < (2 : ℝ) ^ σ := by
+            have : 1 < (2 : ℝ) := by norm_num
+            have hσpos : 0 < σ := lt_trans (by norm_num : (0 : ℝ) < 1/2) hσgt
+            simpa using Real.one_lt_rpow this hσpos
+          -- 1/(2^σ) < 1
+          have : (1 : ℝ) / (2 : ℝ) ^ σ < 1 := by
+            have hpow_ne : (2 : ℝ) ^ σ ≠ 0 := ne_of_gt hden_pos
+            exact by
+              -- use inv_lt_one_iff_of_pos: (0 < a) → (1 / a < 1) ↔ (1 < a)
+              have := inv_lt_one_iff_of_pos.mpr hden_gt1
+              -- inv_lt_one_iff_of_pos : 0 < a → (a⁻¹ < 1 ↔ 1 < a)
+              -- rewrite 1 / a as a⁻¹
+              simpa [one_div] using (this : ( (2 : ℝ) ^ σ)⁻¹ < 1 ↔ 1 < (2 : ℝ) ^ σ)).mpr hden_pos
+          simpa [this])
+      -- If 1 - z = 0 then ‖z‖ = 1, contradiction
+      have : (1 - z p w) ≠ 0 := by
+        intro h
+        have : ‖z p w‖ = 1 := by simpa [h, Complex.norm_eq_abs] using Complex.abs_one
+        exact (ne_of_lt hzlt1) this
+      simpa [Set.mem_setOf_eq] using this
+    -- Compose with analytic log on ℂ \ {0}
+    exact (Complex.analyticOn_log.comp hmap hf)
+  have hF : ∀ p : Prime, AnalyticOn ℂ (F p) U := fun p => (hLog p).add (hExp p)
+  -- Uniform quadratic tail bound: ‖F_p(w)‖ ≤ C · p^{-2σ}
+  have hMaj : ∀ w ∈ U, ∀ p : Prime,
+      ‖F p w‖ ≤ ((1 - (2 : ℝ) ^ (-σ))⁻¹ : ℝ) * ((p.1 : ℝ) ^ (-(2 * σ))) := by
+    intro w hw p
+    have hp_pos : 0 < (p.1 : ℝ) := by exact_mod_cast (Nat.Prime.pos p.2)
+    have hz : ‖z p w‖ = (p.1 : ℝ) ^ (-w.re) := by
+      simpa [z, Complex.norm_eq_abs, ← ofReal_natCast] using Complex.abs_cpow_eq_rpow_re_of_pos hp_pos (-w)
+    -- Re(w) ≥ σ on U
+    have hdist : ‖w - s‖ < δ := by simpa [U, dist_eq, sub_eq] using hw
+    have hre : |w.re - s.re| ≤ ‖w - s‖ := by
+      have : |w.re - s.re| = |(w - s).re| := by simp
+      simpa [this] using Complex.abs_re_le_abs (w - s)
+    have hwre : s.re - δ ≤ w.re := by
+      have : -(‖w - s‖) ≤ w.re - s.re := by
+        have := le_trans (neg_le_abs_self _) hre; simpa [sub_eq_add_neg, add_comm, add_left_comm, add_assoc] using this
+      linarith
+    have hz_le_σ : ‖z p w‖ ≤ (p.1 : ℝ) ^ (-σ) := by
+      have hmono : -w.re ≤ -σ := by linarith [hwre]
+      have := Real.rpow_le_rpow_of_exponent_nonpos (by exact_mod_cast (Nat.succ_le_of_lt p.2.one_lt)) hmono
+      simpa [hz]
+    have hz_le_2 : ‖z p w‖ ≤ (2 : ℝ) ^ (-σ) := by
+      have hnonpos : -σ ≤ 0 := le_of_lt (neg_neg_of_pos (lt_trans (by norm_num : (0 : ℝ) < 1/2) hσgt))
+      have := Real.rpow_le_rpow_of_exponent_nonpos (by exact_mod_cast (Nat.succ_le_of_lt p.2.one_lt)) hnonpos
+      exact le_trans hz_le_σ this
+    -- apply the quadratic tail bound
+    have htail := log_one_sub_plus_z_quadratic_tail (z := z p w) (r := (2 : ℝ) ^ (-σ))
+      (by
+        have : 0 < (2 : ℝ) ^ σ := Real.rpow_pos_of_pos (by norm_num : (0 : ℝ) < 2) _
+        have : 0 < (1 / (2 : ℝ) ^ σ) := inv_pos.mpr this
+        simpa [Real.rpow_neg] using this)
+      (by
+        have : (2 : ℝ) ^ (-σ) = 1 / (2 : ℝ) ^ σ := by
+          simpa [Real.rpow_neg] using (Real.rpow_neg (by norm_num : (0 : ℝ) < 2) σ)
+        have hden_pos : 0 < (2 : ℝ) ^ σ := Real.rpow_pos_of_pos (by norm_num : (0 : ℝ) < 2) _
+        have hden_gt1 : 1 < (2 : ℝ) ^ σ := by
+          have : 1 < (2 : ℝ) := by norm_num
+          have hσpos : 0 < σ := lt_trans (by norm_num : (0 : ℝ) < 1/2) hσgt
+          simpa using Real.one_lt_rpow this hσpos
+        have : (1 / (2 : ℝ) ^ σ) < 1 := by
+          have := one_lt_inv_iff₀.mpr ⟨ne_of_gt hden_pos, hden_gt1⟩; simpa [one_div] using this
+        simpa [this])
+      (by exact hz_le_2)
+    have : ‖F p w‖ ≤ (1 - (2 : ℝ) ^ (-σ))⁻¹ * ‖z p w‖ ^ 2 := by
+      simpa [F, mul_comm] using htail
+    -- rewrite ‖z‖² and relax w.re to σ
+    have hz2 : ‖z p w‖ ^ 2 = (p.1 : ℝ) ^ (-(2 * w.re)) := by
+      simp [hz, Real.rpow_mul (by exact_mod_cast (Nat.zero_le p.1))]
+    have hmonoσ : (p.1 : ℝ) ^ (-(2 * w.re)) ≤ (p.1 : ℝ) ^ (-(2 * σ)) := by
+      have : -(2 * w.re) ≤ -(2 * σ) := by linarith [hwre]
+      exact Real.rpow_le_rpow_of_exponent_nonpos (by exact_mod_cast (Nat.succ_le_of_lt p.2.one_lt)) this
+    exact le_trans (by simpa [hz2] using this) (mul_le_mul_of_nonneg_left hmonoσ (by
+      have : 0 < (1 - (2 : ℝ) ^ (-σ)) := by
+        have : (2 : ℝ) ^ (-σ) < 1 := by
+          have : (2 : ℝ) ^ (-σ) = 1 / (2 : ℝ) ^ σ := by
+            simpa [Real.rpow_neg] using (Real.rpow_neg (by norm_num : (0 : ℝ) < 2) σ)
+          have hden_pos : 0 < (2 : ℝ) ^ σ := Real.rpow_pos_of_pos (by norm_num : (0 : ℝ) < 2) _
+          have hden_gt1 : 1 < (2 : ℝ) ^ σ := by
+            have : 1 < (2 : ℝ) := by norm_num
+            have hσpos : 0 < σ := lt_trans (by norm_num : (0 : ℝ) < 1/2) hσgt
+            simpa using Real.one_lt_rpow this hσpos
+          have : (1 / (2 : ℝ) ^ σ) < 1 := by
+            have := one_lt_inv_iff₀.mpr ⟨ne_of_gt hden_pos, hden_gt1⟩; simpa [one_div] using this
+          simpa [this]
+        exact le_of_lt (inv_pos.mpr this)))
+  -- Summable majorant on primes
+  have hSumMaj : Summable (fun p : Nat.Primes => (p : ℝ) ^ (-(2 * σ))) := by
+    have hr : (1 : ℝ) < 2 * σ := by
+      have : (1 : ℝ) < 2 * (1 / 2 : ℝ) := by norm_num
+      exact lt_of_lt_of_le this (mul_le_mul_of_nonneg_left (le_of_lt hσgt) (by norm_num))
+    simpa [neg_mul] using AcademicRH.EulerProduct.real_prime_rpow_summable (r := (2 * σ)) hr
+  -- Holomorphy of the sum and its exponential on U
+  have hDiff : DifferentiableOn ℂ (fun w => ∑' p : Prime, F p w) U := by
+    let u : Prime → ℝ := fun p => ((1 - (2 : ℝ) ^ (-σ))⁻¹ : ℝ) * ((p.1 : ℝ) ^ (-(2 * σ)))
+    have hu : Summable (fun p : Prime => u p) := by
+      have : Summable (fun p : Nat.Primes => (p : ℝ) ^ (-(2 * σ))) := hSumMaj
+      simpa [u] using this.mul_left ((1 - (2 : ℝ) ^ (-σ))⁻¹)
+    refine Complex.differentiableOn_tsum_of_summable_norm (u := u) (hu := hu)
+      (hf := fun p => (hF p).differentiableOn) (hU := hUopen) ?_
+    intro p w hw; simpa using hMaj w hw p
+  have hAnalyticSum : AnalyticOn ℂ (fun w => ∑' p : Prime, F p w) U := (DifferentiableOn.analyticOn hDiff)
+  have hAnalyticExp : AnalyticOn ℂ (fun w => Complex.exp (∑' p : Prime, F p w)) U := hAnalyticSum.cexp
+  -- Identify product with exp of sum on U
+  have hEq : Set.EqOn diagDet2 (fun w => Complex.exp (∑' p : Prime, F p w)) U := by
+    intro w hw
+    -- termwise: exp(F_p(w)) = (1 - z_p(w)) * exp(z_p(w))
+    have hpw_sum : Summable (fun p : Prime => F p w) := by
+      have : Summable (fun p : Nat.Primes => (p : ℝ) ^ (-(2 * σ))) := hSumMaj
+      exact Summable.of_norm_bounded (fun p : Prime => ((1 - (2 : ℝ) ^ (-σ))⁻¹ : ℝ) * ((p.1 : ℝ) ^ (-(2 * σ))))
+        (by simpa using this.mul_left ((1 - (2 : ℝ) ^ (-σ))⁻¹)) (by intro p; simpa using hMaj w hw p)
+    have hmult := (tprod_exp_of_summable (a := fun p : Prime => F p w) hpw_sum).1
+    have hexp := (tprod_exp_of_summable (a := fun p : Prime => F p w) hpw_sum).2
+    have hterm : ∀ p : Prime, Complex.exp (F p w) = det2EulerFactor w p := by
+      intro p
+      have hz_ne : (1 - z p w) ≠ 0 := by
+        -- deduce from ‖z‖ < 1 as above
+        have hp_pos : 0 < (p.1 : ℝ) := by exact_mod_cast (Nat.Prime.pos p.2)
+        have hz : ‖z p w‖ = (p.1 : ℝ) ^ (-w.re) := by
+          simpa [z, Complex.norm_eq_abs, ← ofReal_natCast] using Complex.abs_cpow_eq_rpow_re_of_pos hp_pos (-w)
+        -- Re(w) ≥ σ ⇒ ‖z‖ ≤ p^{-σ} ≤ 2^{-σ} < 1
+        have hwre : s.re - δ ≤ w.re := by
+          have hdist : ‖w - s‖ < δ := by simpa [U, dist_eq, sub_eq] using hw
+          have hre : |w.re - s.re| ≤ ‖w - s‖ := by
+            have : |w.re - s.re| = |(w - s).re| := by simp
+            simpa [this] using Complex.abs_re_le_abs (w - s)
+          have : -(‖w - s‖) ≤ w.re - s.re := by
+            have := le_trans (neg_le_abs_self _) hre; simpa [sub_eq_add_neg, add_comm, add_left_comm, add_assoc] using this
+          linarith
+        have hz_le2 : ‖z p w‖ ≤ (2 : ℝ) ^ (-σ) := by
+          have : ‖z p w‖ ≤ (p.1 : ℝ) ^ (-σ) := by
+            have hmono : -w.re ≤ -σ := by linarith [hwre]
+            have := Real.rpow_le_rpow_of_exponent_nonpos (by exact_mod_cast (Nat.succ_le_of_lt p.2.one_lt)) hmono
+            simpa [hz]
+          have hnonpos : -σ ≤ 0 := le_of_lt (neg_neg_of_pos (lt_trans (by norm_num : (0 : ℝ) < 1/2) hσgt))
+          have := Real.rpow_le_rpow_of_exponent_nonpos (by exact_mod_cast (Nat.succ_le_of_lt p.2.one_lt)) hnonpos
+          exact le_trans this hnonpos
+        have hzlt1 : ‖z p w‖ < 1 :=
+          lt_of_le_of_lt hz_le2 (by
+            have : (2 : ℝ) ^ (-σ) = 1 / (2 : ℝ) ^ σ := by
+              simpa [Real.rpow_neg] using (Real.rpow_neg (by norm_num : (0 : ℝ) < 2) σ)
+            have hden_pos : 0 < (2 : ℝ) ^ σ := Real.rpow_pos_of_pos (by norm_num : (0 : ℝ) < 2) _
+            have hden_gt1 : 1 < (2 : ℝ) ^ σ := by
+              have : 1 < (2 : ℝ) := by norm_num
+              have hσpos : 0 < σ := lt_trans (by norm_num : (0 : ℝ) < 1/2) hσgt
+              simpa using Real.one_lt_rpow this hσpos
+            have : (1 / (2 : ℝ) ^ σ) < 1 := by
+              have := one_lt_inv_iff₀.mpr ⟨ne_of_gt hden_pos, hden_gt1⟩; simpa [one_div] using this
+            simpa [this])
+        intro h; have : (1 - z p w).re = 0 := by simpa [h]; linarith
+      have : Complex.exp (Complex.log (1 - z p w)) = 1 - z p w := Complex.exp_log hz_ne
+      simp [F, det2EulerFactor, z, this, mul_comm, mul_left_comm, mul_assoc]
+    -- pass products across termwise equality
+    have hprod : (∏' p : Prime, Complex.exp (F p w)) = ∏' p : Prime, det2EulerFactor w p := by
+      refine tprod_congr ?h
+      intro p; simpa using hterm p
+    simpa [diagDet2, hprod] using hexp.symm
+  -- Conclude: `diagDet2` analytic on U, hence analytic within Ω at s
+  have hOnU : AnalyticOn ℂ diagDet2 U := (AnalyticOn.congr hAnalyticExp hEq.symm)
+  have hsU : s ∈ U := by simpa [U, dist_self] using hδpos
+  exact (hOnU.mono hUsub).analyticWithinAt hsU
 
 end RH.AcademicFramework.DiagonalFredholm

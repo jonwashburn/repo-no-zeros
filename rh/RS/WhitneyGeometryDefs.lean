@@ -128,7 +128,7 @@ lemma boxEnergy_mono {gradU : (ℝ × ℝ) → ℝ × ℝ} {σ : Measure (ℝ ×
   have hmono :
       (∫⁻ p in P, ENNReal.ofReal (‖gradU p‖^2 * p.2) ∂σ)
         ≤ (∫⁻ p in Q, ENNReal.ofReal (‖gradU p‖^2 * p.2) ∂σ) := by
-    exact Measure.lintegral_mono_set hPmeas hQmeas h
+    exact lintegral_mono_set h hPmeas hQmeas
   -- Finiteness of both sides
   have hIQfin :
       (∫⁻ p in Q, ENNReal.ofReal (‖gradU p‖^2 * p.2) ∂σ) ≠ ⊤ := by
@@ -207,9 +207,9 @@ lemma finite_lintegral_on_tent_of_L2
         (fun p => ENNReal.ofReal (‖gradU p‖^2 * C))
           = fun p => ENNReal.ofReal (‖gradU p‖^2) * ENNReal.ofReal C := by
       funext p
-      have : 0 ≤ ‖gradU p‖^2 := sq_nonneg _
+      have hnonneg : 0 ≤ ‖gradU p‖^2 := sq_nonneg _
       simpa [mul_comm, mul_left_comm, mul_assoc] using
-        (ENNReal.ofReal_mul this hCnonneg).symm
+        (ENNReal.ofReal_mul hnonneg hCnonneg).symm
     -- pull out the constant across the lintegral
     have :
         (∫⁻ p in tent I α, (fun _ => ENNReal.ofReal C) * ENNReal.ofReal (‖gradU p‖^2))
